@@ -1,4 +1,4 @@
-# Gestión de Residencia Geriátrica — API REST con Spring Boot
+# Gestión de Residencia Geriátrica - API REST con Spring Boot
 
 API REST para administrar una residencia geriátrica: residentes, enfermeros, habitaciones, quién ocupa cada habitación y qué enfermero la atiende.
 
@@ -121,11 +121,11 @@ Todos los errores responden con un JSON `{"error": "mensaje"}` y el código que 
 
 ```mermaid
 flowchart LR
-    P([Postman]) -->|"HTTP + JSON"| C[Controllers<br/>@RestController]
-    C --> S[Servicios<br/>@Service<br/>reglas de negocio]
+    P([Postman]) -->|"HTTP + JSON"| C["Controllers<br/>@RestController"]
+    C --> S["Servicios<br/>@Service<br/>reglas de negocio"]
     S --> R[[Repositorios<br/>JpaRepository]]
     R --> DB[(MySQL)]
-    S -.->|"lanza excepciones"| M[ManejadorDeErrores<br/>@RestControllerAdvice]
+    S -.->|"lanza excepciones"| M["ManejadorDeErrores<br/>@RestControllerAdvice"]
     M -.->|"400 / 404 / 409"| P
 ```
 

@@ -35,10 +35,10 @@ Por eso no hay menú: el "menú" ahora son las URLs. En vez de elegir "1. Alta" 
 flowchart TB
     P([Postman]) -->|"pedido HTTP + JSON"| C
     subgraph App["Aplicación Spring Boot (Tomcat en el puerto 8080)"]
-        C[Controllers<br/>@RestController<br/>URL + verbo HTTP]
-        S[Servicios<br/>@Service<br/>reglas de negocio]
+        C["Controllers<br/>@RestController<br/>URL + verbo HTTP"]
+        S["Servicios<br/>@Service<br/>reglas de negocio"]
         R[[Repositorios<br/>JpaRepository<br/>los implementa Spring]]
-        M[ManejadorDeErrores<br/>@RestControllerAdvice]
+        M["ManejadorDeErrores<br/>@RestControllerAdvice"]
         C --> S --> R
         S -.->|"lanza una excepción"| M
     end
