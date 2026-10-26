@@ -9,65 +9,57 @@ import prog2.residenciageriatricaspring.dto.PersonaHabitacionDTO;
 import prog2.residenciageriatricaspring.excepciones.EntidadNoEncontradaException;
 import prog2.residenciageriatricaspring.excepciones.OperacionNoPermitidaException;
 import prog2.residenciageriatricaspring.modelos.Habitacion;
-import prog2.residenciageriatricaspring.modelos.Reserva;
 import prog2.residenciageriatricaspring.modelos.Residente;
 import prog2.residenciageriatricaspring.repositorios.HabitacionRepository;
-import prog2.residenciageriatricaspring.repositorios.ReservaRepository;
 import prog2.residenciageriatricaspring.repositorios.ResidenteRepository;
 
 /**
  * Reglas de las reservas: un residente ocupa como máximo una habitación,
- * y una habitación tiene como máximo un residente.
+ * y una habitación tiene como máximo un residente. La reserva se guarda en la habitación (id_residente).
  * @author Emanuel
  */
 @Service
 public class ReservaServicio {
 
-    private final ReservaRepository reservaRepository;
-    private final ResidenteRepository residenteRepository;
     private final HabitacionRepository habitacionRepository;
+    private final ResidenteRepository residenteRepository;
 
-    public ReservaServicio(ReservaRepository reservaRepository,
-                           ResidenteRepository residenteRepository,
-                           HabitacionRepository habitacionRepository) {
-        this.reservaRepository = reservaRepository;
-        this.residenteRepository = residenteRepository;
+    public ReservaServicio(HabitacionRepository habitacionRepository,
+                           ResidenteRepository residenteRepository) {
         this.habitacionRepository = habitacionRepository;
+        this.residenteRepository = residenteRepository;
     }
 
     public void reservar(int idResidente, String codigo) {
         String normalizado = Habitacion.normalizarCodigo(codigo);
-        if (!residenteRepository.existsById(idResidente)) {
+        Optional<Residente> residente = residenteRepository.findById(idResidente);
+        if (residente.isEmpty()) {
             throw new EntidadNoEncontradaException("No existe el residente " + idResidente + ".");
         }
-        if (!habitacionRepository.existsById(normalizado)) {
-            throw new EntidadNoEncontradaException("No existe la habitación " + normalizado + ".");
-        }
-        if (reservaRepository.existsByIdResidente(idResidente)) {
+        Habitacion habitacion = buscarHabitacion(normalizado);
+        if (habitacionRepository.existsByResidenteId(idResidente)) {
             throw new OperacionNoPermitidaException("El residente " + idResidente + " ya tiene una habitación.");
         }
-        if (reservaRepository.existsById(normalizado)) {
+        if (habitacion.isOcupada()) {
             throw new OperacionNoPermitidaException("La habitación " + normalizado + " ya está ocupada.");
         }
-        reservaRepository.save(new Reserva(idResidente, normalizado));
+        habitacionRepository.save(habitacion.conResidente(residente.get()));   // UPDATE de id_residente
     }
 
     public void liberar(String codigo) {
         String normalizado = Habitacion.normalizarCodigo(codigo);
-        if (!reservaRepository.existsById(normalizado)) {
+        Habitacion habitacion = buscarHabitacion(normalizado);
+        if (!habitacion.isOcupada()) {
             throw new EntidadNoEncontradaException("La habitación " + normalizado + " no está ocupada.");
         }
-        reservaRepository.deleteById(normalizado);
+        habitacionRepository.save(habitacion.conResidente(null));             // id_residente = NULL
     }
 
     /** Habitaciones ocupadas, cada una con su residente. */
     public List<PersonaHabitacionDTO> listar() {
         List<PersonaHabitacionDTO> resultado = new ArrayList<>();
-        for (Reserva r : reservaRepository.findAll()) {
-            Optional<Residente> residente = residenteRepository.findById(r.getIdResidente());
-            if (residente.isPresent()) {
-                resultado.add(new PersonaHabitacionDTO(PersonaDTO.desde(residente.get()), r.getCodigoHabitacion()));
-            }
+        for (Habitacion h : habitacionRepository.findByResidenteIsNotNull()) {
+            resultado.add(new PersonaHabitacionDTO(PersonaDTO.desde(h.getResidente()), h.getCodigo()));
         }
         return resultado;
     }
@@ -76,7 +68,7 @@ public class ReservaServicio {
     public List<PersonaDTO> residentesSinHabitacion() {
         List<PersonaDTO> resultado = new ArrayList<>();
         for (Residente r : residenteRepository.findAll()) {
-            if (!reservaRepository.existsByIdResidente(r.getId())) {
+            if (!habitacionRepository.existsByResidenteId(r.getId())) {
                 resultado.add(PersonaDTO.desde(r));
             }
         }
@@ -86,11 +78,17 @@ public class ReservaServicio {
     /** Códigos de las habitaciones libres. */
     public List<String> habitacionesLibres() {
         List<String> resultado = new ArrayList<>();
-        for (Habitacion h : habitacionRepository.findAll()) {
-            if (!reservaRepository.existsById(h.getCodigo())) {
-                resultado.add(h.getCodigo());
-            }
+        for (Habitacion h : habitacionRepository.findByResidenteIsNull()) {
+            resultado.add(h.getCodigo());
         }
         return resultado;
+    }
+
+    private Habitacion buscarHabitacion(String codigo) {
+        Optional<Habitacion> habitacion = habitacionRepository.findById(codigo);
+        if (habitacion.isEmpty()) {
+            throw new EntidadNoEncontradaException("No existe la habitación " + codigo + ".");
+        }
+        return habitacion.get();
     }
 }

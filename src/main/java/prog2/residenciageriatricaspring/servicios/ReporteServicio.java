@@ -7,17 +7,15 @@ import org.springframework.stereotype.Service;
 import prog2.residenciageriatricaspring.dto.PersonaDTO;
 import prog2.residenciageriatricaspring.dto.PersonaHabitacionDTO;
 import prog2.residenciageriatricaspring.excepciones.EntidadNoEncontradaException;
-import prog2.residenciageriatricaspring.modelos.Asignacion;
-import prog2.residenciageriatricaspring.modelos.Enfermero;
-import prog2.residenciageriatricaspring.modelos.Reserva;
+import prog2.residenciageriatricaspring.modelos.Habitacion;
 import prog2.residenciageriatricaspring.modelos.Residente;
-import prog2.residenciageriatricaspring.repositorios.AsignacionRepository;
 import prog2.residenciageriatricaspring.repositorios.EnfermeroRepository;
-import prog2.residenciageriatricaspring.repositorios.ReservaRepository;
+import prog2.residenciageriatricaspring.repositorios.HabitacionRepository;
 import prog2.residenciageriatricaspring.repositorios.ResidenteRepository;
 
 /**
- * Consultas que cruzan datos de varias entidades.
+ * Consultas que cruzan datos de varias entidades. Todas pasan por la habitación,
+ * que es la que sabe quién la ocupa y quién la atiende.
  * @author Emanuel
  */
 @Service
@@ -25,43 +23,36 @@ public class ReporteServicio {
 
     private final ResidenteRepository residenteRepository;
     private final EnfermeroRepository enfermeroRepository;
-    private final ReservaRepository reservaRepository;
-    private final AsignacionRepository asignacionRepository;
+    private final HabitacionRepository habitacionRepository;
 
     public ReporteServicio(ResidenteRepository residenteRepository,
                            EnfermeroRepository enfermeroRepository,
-                           ReservaRepository reservaRepository,
-                           AsignacionRepository asignacionRepository) {
+                           HabitacionRepository habitacionRepository) {
         this.residenteRepository = residenteRepository;
         this.enfermeroRepository = enfermeroRepository;
-        this.reservaRepository = reservaRepository;
-        this.asignacionRepository = asignacionRepository;
+        this.habitacionRepository = habitacionRepository;
     }
 
     /** 1. El residente con la habitación que ocupa (sin código si no tiene). */
     public PersonaHabitacionDTO habitacionDeResidente(int idResidente) {
         Residente residente = buscarResidente(idResidente);
-        Optional<Reserva> reserva = reservaRepository.findByIdResidente(idResidente);
+        Optional<Habitacion> habitacion = habitacionRepository.findByResidenteId(idResidente);
         String codigo = null;                                   // queda null si no tiene habitación
-        if (reserva.isPresent()) {
-            codigo = reserva.get().getCodigoHabitacion();
+        if (habitacion.isPresent()) {
+            codigo = habitacion.get().getCodigo();
         }
         return new PersonaHabitacionDTO(PersonaDTO.desde(residente), codigo);
     }
 
-    /** 2. ¿Qué residentes atiende el enfermero? */
+    /** 2. ¿Qué residentes atiende el enfermero? Los de las habitaciones ocupadas que tiene asignadas. */
     public List<PersonaDTO> residentesDeEnfermero(int idEnfermero) {
         if (!enfermeroRepository.existsById(idEnfermero)) {
             throw new EntidadNoEncontradaException("No existe el enfermero " + idEnfermero + ".");
         }
         List<PersonaDTO> resultado = new ArrayList<>();
-        for (Asignacion a : asignacionRepository.findByIdEnfermero(idEnfermero)) {
-            Optional<Reserva> reserva = reservaRepository.findById(a.getCodigoHabitacion());
-            if (reserva.isPresent()) {
-                Optional<Residente> r = residenteRepository.findById(reserva.get().getIdResidente());
-                if (r.isPresent()) {
-                    resultado.add(PersonaDTO.desde(r.get()));
-                }
+        for (Habitacion h : habitacionRepository.findByEnfermeroId(idEnfermero)) {
+            if (h.isOcupada()) {
+                resultado.add(PersonaDTO.desde(h.getResidente()));
             }
         }
         return resultado;
@@ -70,19 +61,11 @@ public class ReporteServicio {
     /** 3. ¿Qué enfermero atiende al residente? Vacío si no tiene. */
     public Optional<PersonaDTO> enfermeroDeResidente(int idResidente) {
         buscarResidente(idResidente);                           // si no existe, lanza la excepción
-        Optional<Reserva> reserva = reservaRepository.findByIdResidente(idResidente);
-        if (reserva.isEmpty()) {
+        Optional<Habitacion> habitacion = habitacionRepository.findByResidenteId(idResidente);
+        if (habitacion.isEmpty() || !habitacion.get().tieneEnfermero()) {
             return Optional.empty();
         }
-        Optional<Asignacion> asignacion = asignacionRepository.findById(reserva.get().getCodigoHabitacion());
-        if (asignacion.isEmpty()) {
-            return Optional.empty();
-        }
-        Optional<Enfermero> enfermero = enfermeroRepository.findById(asignacion.get().getIdEnfermero());
-        if (enfermero.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(PersonaDTO.desde(enfermero.get()));
+        return Optional.of(PersonaDTO.desde(habitacion.get().getEnfermero()));
     }
 
     private Residente buscarResidente(int idResidente) {

@@ -3,7 +3,7 @@ package prog2.residenciageriatricaspring.servicios;
 import org.springframework.stereotype.Service;
 import prog2.residenciageriatricaspring.modelos.Residente;
 import prog2.residenciageriatricaspring.repositorios.EnfermeroRepository;
-import prog2.residenciageriatricaspring.repositorios.ReservaRepository;
+import prog2.residenciageriatricaspring.repositorios.HabitacionRepository;
 import prog2.residenciageriatricaspring.repositorios.ResidenteRepository;
 
 /**
@@ -13,14 +13,14 @@ import prog2.residenciageriatricaspring.repositorios.ResidenteRepository;
 @Service
 public class ResidenteServicio extends PersonaServicio<Residente> {
 
-    private final ReservaRepository reservaRepository;   // para no borrar un residente con habitación
+    private final HabitacionRepository habitacionRepository;   // para no borrar un residente con habitación
 
     // Spring ve este constructor y le pasa los repositorios solo (inyección de dependencias)
     public ResidenteServicio(ResidenteRepository residenteRepository,
                              EnfermeroRepository enfermeroRepository,
-                             ReservaRepository reservaRepository) {
+                             HabitacionRepository habitacionRepository) {
         super(residenteRepository, enfermeroRepository);
-        this.reservaRepository = reservaRepository;
+        this.habitacionRepository = habitacionRepository;
     }
 
     @Override
@@ -30,7 +30,7 @@ public class ResidenteServicio extends PersonaServicio<Residente> {
 
     @Override
     protected boolean estaEnUso(int id) {
-        return reservaRepository.existsByIdResidente(id);
+        return habitacionRepository.existsByResidenteId(id);
     }
 
     @Override

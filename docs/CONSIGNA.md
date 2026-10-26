@@ -47,10 +47,11 @@ Los ids y los códigos se generan automáticamente y de manera incremental. El u
 |---|---|---|
 | CRUD de residentes | `GET` / `POST` `/residentes`, `GET` / `PUT` / `DELETE` `/residentes/{id}` | `ResidenteController` → `PersonaServicio<T>` |
 | CRUD de enfermeros | Los mismos, en `/enfermeros` | `EnfermeroController` → `PersonaServicio<T>` |
-| CRUD de habitaciones | `GET` / `POST` `/habitaciones`, `GET` / `DELETE` `/habitaciones/{codigo}` | `HabitacionController` → `HabitacionServicio`. No hay `PUT`: el código es la identidad y el estado se calcula |
-| Estado ocupada / libre | `GET /habitaciones` (campo `ocupada`) | Se calcula a partir de las reservas (`HabitacionServicio.listar()`), no se guarda en la tabla |
-| Residente ↔ habitación, uno a uno | `POST /reservas?idResidente=&codigo=`, `DELETE /reservas/{codigo}` | `ReservaServicio.reservar()`. Además, la clave primaria de `reservas` es el código de habitación |
-| Enfermero → habitaciones, uno a muchos | `POST /asignaciones?idEnfermero=&codigo=`, `DELETE /asignaciones/{codigo}` | `AsignacionServicio.asignar()`. La clave de `asignaciones` es el código de habitación |
+| CRUD de habitaciones | `GET` / `POST` `/habitaciones`, `GET` / `DELETE` `/habitaciones/{codigo}` | `HabitacionController` → `HabitacionServicio`. No hay `PUT`: el código es la identidad; residente y enfermero se cambian con reservas y asignaciones |
+| Estado ocupada / libre | `GET /habitaciones` (campo `ocupada`) | `Habitacion.isOcupada()`: está ocupada si `id_residente` no es NULL. No hay columna `ocupada` |
+| Reserva y Asignación | `/reservas` y `/asignaciones` | No son tablas aparte: son las columnas `id_residente` e `id_enfermero` de `habitaciones` (3 tablas en total), porque ninguna relación es muchos a muchos ni tiene datos propios |
+| Residente ↔ habitación, uno a uno | `POST /reservas?idResidente=&codigo=`, `DELETE /reservas/{codigo}` | `ReservaServicio.reservar()`. Además, en la base `habitaciones.id_residente` es FK y `UNIQUE` (`@OneToOne`) |
+| Enfermero → habitaciones, uno a muchos | `POST /asignaciones?idEnfermero=&codigo=`, `DELETE /asignaciones/{codigo}` | `AsignacionServicio.asignar()`. En la base, `habitaciones.id_enfermero` es FK sin `UNIQUE` (`@ManyToOne`) |
 | Consulta 1: residente con su habitación | `GET /reportes/residentes/{id}/habitacion` | `ReporteServicio.habitacionDeResidente()` |
 | Consulta 2: residentes de un enfermero | `GET /reportes/enfermeros/{id}/residentes` | `ReporteServicio.residentesDeEnfermero()` |
 | Consulta 3: enfermero de un residente | `GET /reportes/residentes/{id}/enfermero` | `ReporteServicio.enfermeroDeResidente()` |

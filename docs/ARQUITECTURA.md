@@ -34,7 +34,7 @@ Por eso no hay menú: el "menú" ahora son las URLs. En vez de elegir "1. Alta" 
 ```mermaid
 flowchart TB
     P([Postman]) -->|"pedido HTTP + JSON"| C
-    subgraph App["Aplicación Spring Boot (Tomcat en el puerto 8080)"]
+    subgraph App["Aplicación Spring Boot (Tomcat en el puerto 8081)"]
         C["Controllers<br/>@RestController<br/>URL + verbo HTTP"]
         S["Servicios<br/>@Service<br/>reglas de negocio"]
         R[[Repositorios<br/>JpaRepository<br/>los implementa Spring]]
@@ -144,7 +144,7 @@ El **servicio es la frontera**:
 
 1. **Protegen lo que entra.** Si el controller recibiera un `Residente` directo, alguien podría mandar `{"id": 3, ...}` en un alta y pisar al residente 3. Con el DTO, el servicio decide qué datos usa: en el alta ignora el id y lo genera MySQL.
 2. **Permiten mostrar cosas que no son tablas.** Ninguno de estos existe en la base:
-   - `HabitacionDTO` tiene `ocupada`, que **se calcula** a partir de las reservas.
+   - `HabitacionDTO` tiene `ocupada`, que **se calcula** (`residente != null`); no es una columna.
    - `HabitacionDetalleDTO` junta habitación + residente + enfermero en una sola respuesta.
    - `PersonaHabitacionDTO` junta una persona con el código de su habitación.
 3. **Separan la base de lo que ve el usuario.** Si cambia una columna de la tabla, el JSON de la API puede seguir igual: solo cambia cómo se arma el DTO.
@@ -188,6 +188,8 @@ Por eso la regla es: **las entidades viven del servicio para abajo; los DTO, del
 - **¿Qué hace Spring por vos?** Crea los objetos y los conecta (IoC/DI), levanta el servidor Tomcat, convierte JSON ↔ objetos e implementa los repositorios.
 - **¿Qué es JPA y qué es Hibernate?** JPA es la especificación (las anotaciones `@Entity`, `@Id`...). Hibernate es la implementación que traduce los objetos a SQL. Spring Data JPA da los repositorios listos.
 - **¿Por qué `Persona` es `@MappedSuperclass` y no `@Entity`?** Porque no hay "personas sueltas": solo residentes y enfermeros. Cada uno tiene su tabla con los campos heredados.
-- **¿Por qué el `@Id` de `Reserva` es el código de habitación?** Porque una clave primaria no se repite: la base misma impide que una habitación tenga dos reservas.
+- **¿Por qué 3 tablas y no 5?** Porque ninguna relación es muchos a muchos. La reserva es una FK `id_residente` en `habitaciones` y la asignación es una FK `id_enfermero`. Una tabla intermedia solo hace falta para muchos a muchos o si la relación tiene datos propios (fecha de ingreso, turno).
+- **¿Cómo garantiza la base el uno a uno?** `id_residente` es `UNIQUE` (`@JoinColumn(unique = true)`): MySQL no deja poner al mismo residente en dos habitaciones. Igual el servicio lo controla antes, para responder un 409 con un mensaje claro.
+- **¿Por qué siguen existiendo `/reservas` y `/asignaciones` si no hay tablas?** Porque un recurso REST no tiene por qué ser una tabla. Cambió la base, pero la API se ve igual, y el frontend no tuvo que tocarse.
 - **¿Qué cambió de la consola?** Las puntas: vistas → controllers REST, archivos → MySQL. Las reglas (servicios) quedaron iguales.
 - **¿Para qué sirve el DTO?** Ver la sección 7.

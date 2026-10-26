@@ -2,7 +2,7 @@
 
 API REST para administrar una residencia geriátrica: residentes, enfermeros, habitaciones, quién ocupa cada habitación y qué enfermero la atiende.
 
-Proyecto de **Programación II** (INSPT-UTN). Es la misma aplicación que la [versión de consola](https://github.com/Emanuelbig/gestion-residencia-geriatrica-java-mvc) (MVC en capas con archivos), pasada a **Spring Boot + JPA + MySQL**. Las reglas de negocio son las mismas; lo que cambia es cómo se guardan los datos y cómo se usa el sistema: en lugar de menús de consola, se usa por HTTP (con Postman, por ejemplo).
+Proyecto de **Programación II** (INSPT-UTN). Es la misma aplicación que la [versión de consola](https://github.com/Emanuelbig/gestion-residencia-geriatrica-java-mvc) (MVC en capas con archivos), pasada a **Spring Boot + JPA + MySQL**. Las reglas de negocio son las mismas; lo que cambia es cómo se guardan los datos y cómo se usa el sistema: en lugar de menús de consola, se usa por HTTP (con Postman, o desde el [frontend web](https://github.com/Emanuelbig/gestion-residencia-geriatrica-frontend-jsp) hecho con Servlets y JSP).
 
 La consigna original del parcial, y qué endpoint y qué clase cumplen cada punto, está en [docs/CONSIGNA.md](docs/CONSIGNA.md).
 
@@ -22,7 +22,7 @@ La consigna original del parcial, y qué endpoint y qué clase cumplen cada punt
 
 ## Cómo ejecutarlo
 
-1. **Crear la base con datos de prueba:** abrir [`base-de-datos.sql`](base-de-datos.sql) en MySQL Workbench y ejecutarlo (el rayo). Crea la base `geriatrico`, las 5 tablas y carga 4 residentes, 3 enfermeros, 5 habitaciones, 3 reservas y 3 asignaciones.
+1. **Crear la base con datos de prueba:** abrir [`base-de-datos.sql`](base-de-datos.sql) en MySQL Workbench y ejecutarlo (el rayo). Crea la base `geriatrico`, las 3 tablas y carga 4 residentes, 3 enfermeros y 5 habitaciones (3 ocupadas y con enfermero).
    Si preferís empezar vacío, alcanza con `CREATE DATABASE geriatrico;`: Hibernate crea las tablas solo al arrancar.
 2. Crear el archivo `src/main/resources/secreto.properties` (al lado de `application.properties`) con tu usuario y contraseña de MySQL:
    ```properties
@@ -35,9 +35,9 @@ La consigna original del parcial, y qué endpoint y qué clase cumplen cada punt
    ```bash
    mvnw spring-boot:run
    ```
-4. Cuando la consola muestra `Tomcat started on port 8080`, la API está escuchando en `http://localhost:8080`.
+4. Cuando la consola muestra `Tomcat started on port 8081`, la API está escuchando en `http://localhost:8081` (el puerto se define con `server.port` en `application.properties`; el 8080 queda libre para el [frontend](https://github.com/Emanuelbig/gestion-residencia-geriatrica-frontend-jsp)).
 
-> `http://localhost:8080` solo (sin ruta) da un error 404: es normal, porque la API no tiene página de inicio. Hay que llamar a un endpoint, por ejemplo `http://localhost:8080/residentes`.
+> `http://localhost:8081` solo (sin ruta) da un error 404: es normal, porque la API no tiene página de inicio. Hay que llamar a un endpoint, por ejemplo `http://localhost:8081/residentes`.
 
 ---
 
@@ -64,7 +64,7 @@ Los dos tienen los mismos endpoints (comparten la clase `PersonaController`).
 | POST | `/habitaciones` (sin body) | **201** + la habitación creada (el código se genera solo: HAB-101, HAB-102...) |
 | DELETE | `/habitaciones/{codigo}` | **204** · 409 si está ocupada o tiene enfermero |
 
-No hay PUT: el único dato de una habitación es su código, que es su identidad, y el estado ocupada/libre se calcula a partir de las reservas.
+No hay PUT: el código es la identidad de la habitación, y su residente y su enfermero se cambian con `/reservas` y `/asignaciones`.
 
 ### Reservas (`/reservas`): residente ↔ habitación, uno a uno
 
@@ -112,8 +112,43 @@ Todos los errores responden con un JSON `{"error": "mensaje"}` y el código que 
 - Los ids los genera MySQL (`AUTO_INCREMENT`) y nunca se reutilizan. Los códigos de habitación los genera el sistema.
 - Un residente ocupa como máximo **una** habitación, y una habitación tiene como máximo **un** residente.
 - Un enfermero puede atender **varias** habitaciones, pero cada habitación tiene como máximo **un** enfermero.
-- Si una habitación está ocupada **no se guarda**: se calcula a partir de las reservas.
+- La reserva y la asignación se guardan **dentro de la habitación** (`id_residente`, `id_enfermero`). Está ocupada cuando tiene un residente: no hay una columna `ocupada` aparte que se pueda desincronizar.
 - No se puede borrar nada que esté en uso.
+
+---
+
+## Base de datos: 3 tablas
+
+```mermaid
+erDiagram
+    residentes ||--o| habitaciones : "ocupa (uno a uno)"
+    enfermeros ||--o{ habitaciones : "atiende (uno a muchos)"
+    residentes {
+        int id PK
+        varchar dni
+        varchar nombre
+        varchar apellido
+    }
+    enfermeros {
+        int id PK
+        varchar dni
+        varchar nombre
+        varchar apellido
+    }
+    habitaciones {
+        varchar codigo PK
+        int id_residente FK "UNIQUE, NULL si está libre"
+        int id_enfermero FK "NULL si no tiene"
+    }
+```
+
+- Ninguna relación es *muchos a muchos*, así que no hace falta una tabla intermedia: alcanza con una clave foránea en la habitación.
+- `id_residente` es **UNIQUE**: la base misma impide que un residente esté en dos habitaciones (uno a uno). `id_enfermero` no lo es, porque un enfermero atiende varias (uno a muchos).
+- Las **FK** impiden guardar un residente o enfermero que no existe.
+- En JPA se mapea con `@OneToOne` + `@JoinColumn(unique = true)` para el residente y `@ManyToOne` para el enfermero, en la entidad `Habitacion`.
+- Los endpoints `/reservas` y `/asignaciones` siguen existiendo: un **recurso** de la API no tiene por qué ser una tabla. Por eso el frontend no tuvo que cambiar.
+
+> Una versión anterior tenía 5 tablas (con `reservas` y `asignaciones`) y quedó en el historial de git. Una tabla intermedia solo hace falta si la relación es muchos a muchos o tiene datos propios (por ejemplo, fecha de ingreso).
 
 ---
 
@@ -131,7 +166,7 @@ flowchart LR
 
 | Paquete | Qué tiene | En la versión de consola era... |
 |---|---|---|
-| `modelos` | Entidades JPA. `Persona` es `@MappedSuperclass` abstracta; `Residente` y `Enfermero` la heredan | Los mismos modelos, sin anotaciones |
+| `modelos` | Entidades JPA. `Persona` es `@MappedSuperclass` abstracta; `Residente` y `Enfermero` la heredan. `Habitacion` guarda su residente (`@OneToOne`) y su enfermero (`@ManyToOne`) | Los mismos modelos, sin anotaciones |
 | `repositorios` | Interfaces que extienden `JpaRepository`. Spring escribe la implementación | `GenericDAO`, `ArchivoDAO` y un DAO por entidad |
 | `dto` | Lo que entra y sale en JSON | Igual |
 | `servicios` | Reglas de negocio. `PersonaServicio<T>` reúne lo común a residentes y enfermeros | Igual |

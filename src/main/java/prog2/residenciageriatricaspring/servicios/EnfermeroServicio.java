@@ -2,8 +2,8 @@ package prog2.residenciageriatricaspring.servicios;
 
 import org.springframework.stereotype.Service;
 import prog2.residenciageriatricaspring.modelos.Enfermero;
-import prog2.residenciageriatricaspring.repositorios.AsignacionRepository;
 import prog2.residenciageriatricaspring.repositorios.EnfermeroRepository;
+import prog2.residenciageriatricaspring.repositorios.HabitacionRepository;
 import prog2.residenciageriatricaspring.repositorios.ResidenteRepository;
 
 /**
@@ -13,13 +13,13 @@ import prog2.residenciageriatricaspring.repositorios.ResidenteRepository;
 @Service
 public class EnfermeroServicio extends PersonaServicio<Enfermero> {
 
-    private final AsignacionRepository asignacionRepository;   // para no borrar un enfermero con habitaciones
+    private final HabitacionRepository habitacionRepository;   // para no borrar un enfermero con habitaciones
 
     public EnfermeroServicio(EnfermeroRepository enfermeroRepository,
                              ResidenteRepository residenteRepository,
-                             AsignacionRepository asignacionRepository) {
+                             HabitacionRepository habitacionRepository) {
         super(enfermeroRepository, residenteRepository);
-        this.asignacionRepository = asignacionRepository;
+        this.habitacionRepository = habitacionRepository;
     }
 
     @Override
@@ -29,7 +29,7 @@ public class EnfermeroServicio extends PersonaServicio<Enfermero> {
 
     @Override
     protected boolean estaEnUso(int id) {
-        return asignacionRepository.existsByIdEnfermero(id);
+        return habitacionRepository.existsByEnfermeroId(id);
     }
 
     @Override

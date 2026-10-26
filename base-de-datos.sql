@@ -1,5 +1,5 @@
 -- Base de datos completa de la API de la residencia geriátrica:
--- crea la base, crea las 5 tablas y carga datos de ejemplo.
+-- crea la base, crea las 3 tablas y carga datos de ejemplo.
 --
 -- Cómo usarlo: abrirlo en MySQL Workbench (File > Open SQL Script) y ejecutarlo con el rayo (Ctrl+Shift+Enter).
 -- Se puede ejecutar las veces que quieras: siempre deja la base como recién instalada.
@@ -13,6 +13,8 @@ CREATE DATABASE IF NOT EXISTS geriatrico CHARACTER SET utf8mb4;
 USE geriatrico;
 
 -- 2. Las tablas (las mismas que genera Hibernate a partir de las entidades)
+-- Primero se borran las que apuntan a otras (habitaciones tiene FK a residentes y enfermeros).
+-- reservas y asignaciones son las tablas de la versión anterior, de 5 tablas.
 DROP TABLE IF EXISTS reservas;
 DROP TABLE IF EXISTS asignaciones;
 DROP TABLE IF EXISTS habitaciones;
@@ -36,24 +38,18 @@ CREATE TABLE enfermeros (
     PRIMARY KEY (id)
 ) ENGINE = InnoDB;
 
--- Solo el código: si está ocupada no se guarda, se calcula con las reservas
+-- La habitación guarda quién la ocupa y quién la atiende. NULL = no hay.
+--   id_residente: FK + UNIQUE → un residente ocupa una sola habitación (uno a uno)
+--   id_enfermero: FK sin UNIQUE → un enfermero atiende varias habitaciones (uno a muchos)
+-- Las FK no dejan guardar un residente o enfermero que no existe, ni borrar uno que está en una habitación.
 CREATE TABLE habitaciones (
-    codigo VARCHAR(255) NOT NULL,
-    PRIMARY KEY (codigo)
-) ENGINE = InnoDB;
-
--- La clave es el código de habitación: así una habitación no puede tener dos reservas
-CREATE TABLE reservas (
-    codigo_habitacion VARCHAR(255) NOT NULL,
-    id_residente      INTEGER NOT NULL,
-    PRIMARY KEY (codigo_habitacion)
-) ENGINE = InnoDB;
-
--- La clave es el código de habitación: así una habitación no puede tener dos enfermeros
-CREATE TABLE asignaciones (
-    codigo_habitacion VARCHAR(255) NOT NULL,
-    id_enfermero      INTEGER NOT NULL,
-    PRIMARY KEY (codigo_habitacion)
+    codigo       VARCHAR(255) NOT NULL,
+    id_residente INTEGER NULL,
+    id_enfermero INTEGER NULL,
+    PRIMARY KEY (codigo),
+    CONSTRAINT uk_habitacion_residente UNIQUE (id_residente),
+    CONSTRAINT fk_habitacion_residente FOREIGN KEY (id_residente) REFERENCES residentes (id),
+    CONSTRAINT fk_habitacion_enfermero FOREIGN KEY (id_enfermero) REFERENCES enfermeros (id)
 ) ENGINE = InnoDB;
 
 -- 3. Datos de ejemplo (los mismos que trae la versión de consola)
@@ -71,28 +67,16 @@ INSERT INTO enfermeros (id, dni, nombre, apellido) VALUES
     (2, '35678901', 'Martín', 'López'),
     (3, '37890123', 'Valeria', 'Torres');
 
-INSERT INTO habitaciones (codigo) VALUES
-    ('HAB-101'),
-    ('HAB-102'),
-    ('HAB-103'),
-    ('HAB-104'),
-    ('HAB-105');
-
--- Rosa en la 101, Alberto en la 102, Marta en la 103 (Héctor queda sin habitación)
-INSERT INTO reservas (codigo_habitacion, id_residente) VALUES
-    ('HAB-101', 1),
-    ('HAB-102', 2),
-    ('HAB-103', 3);
-
--- Lucía atiende la 101 y la 102, Martín la 103 (Valeria queda libre)
-INSERT INTO asignaciones (codigo_habitacion, id_enfermero) VALUES
-    ('HAB-101', 1),
-    ('HAB-102', 1),
-    ('HAB-103', 2);
+-- Rosa en la 101, Alberto en la 102, Marta en la 103 (Héctor queda sin habitación).
+-- Lucía atiende la 101 y la 102, Martín la 103 (Valeria queda libre). La 104 y la 105 están vacías.
+INSERT INTO habitaciones (codigo, id_residente, id_enfermero) VALUES
+    ('HAB-101', 1, 1),
+    ('HAB-102', 2, 1),
+    ('HAB-103', 3, 2),
+    ('HAB-104', NULL, NULL),
+    ('HAB-105', NULL, NULL);
 
 -- 4. Para comprobar que se cargó todo
 SELECT * FROM residentes;
 SELECT * FROM enfermeros;
 SELECT * FROM habitaciones;
-SELECT * FROM reservas;
-SELECT * FROM asignaciones;
